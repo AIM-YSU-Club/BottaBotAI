@@ -1,0 +1,19 @@
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements/base.txt requirements/reranker.txt requirements/
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements/reranker.txt
+
+COPY bottabot/ bottabot/
+
+ENV PYTHONPATH=/app
+
+CMD ["celery", "-A", "bottabot.celery.app", "worker", "-Q", "reranker_queue", "--loglevel=info", "-c", "1"]

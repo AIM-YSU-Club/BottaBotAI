@@ -1,0 +1,76 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: always
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: bottabot_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./bottabot:/app/bottabot
+    environment:
+      - REDIS_URL=${REDIS_URL}
+      - OLLAMA_URL=http://ollama:11434
+    depends_on:
+      - ollama
+    restart: always
+
+  reranker_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.reranker
+    container_name: worker_reranker
+    command: celery -A bottabot.celery.app worker -Q reranker_queue --loglevel=info -c 1
+    volumes:
+      - ./bottabot:/app/bottabot
+      - ./hf_cache:/root/.cache/huggingface
+    environment:
+      - HF_HOME=/root/.cache/huggingface
+      - REDIS_URL=${REDIS_URL}
+      - OLLAMA_URL=http://ollama:11434
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: always
+    depends_on:
+      - ollama
+
+  docling_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.docling
+    container_name: worker_docling
+    command: celery -A bottabot.celery.app worker -Q docling_queue --loglevel=info -c 1
+    volumes:
+      - ./bottabot:/app/bottabot
+      - ./docling_cache:/root/.cache
+    environment:
+      - REDIS_URL=${REDIS_URL}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: always
