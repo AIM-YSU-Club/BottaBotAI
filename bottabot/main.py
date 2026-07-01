@@ -1,12 +1,12 @@
 # FastAPI 서버 구현부
-from fastapi import FastAPI
-
-from bottabot.api.router import api_router
+import asyncio
+from fastapi import FastAPI, Request
+# API 라우터
+from bottabot.api.embed_api import embed_api_router 
 
 app = FastAPI(title="BottaBotAI")
-app.include_router(api_router)
+app.include_router(embed_api_router)
 
-
-@app.get("/health")
-def health() -> dict:
-    return {"status": "ok"}
+@app.get("/")
+async def read_root():
+    return {"message": "BottaAI Server is working."}
