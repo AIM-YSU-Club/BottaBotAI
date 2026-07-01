@@ -8,3 +8,4 @@ venv/
 ollama_data/
 hf_cache/
 docling_cache/
+redis_data/

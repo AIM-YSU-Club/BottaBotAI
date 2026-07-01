@@ -1,16 +1,7 @@
 # =============================================================================
 # docling.txt — docling_worker 전용 의존성
 # =============================================================================
-# 사용처: Dockerfile.docling
-# 베이스 이미지: pytorch/pytorch (CUDA)
-# OS 패키지(poppler, tesseract 등)는 Dockerfile.docling의 apt-get에서 설치
-#
-# 큐: docling_queue
-# 태스크: bottabot/celery/tasks/docling.py
-# =============================================================================
 
 -r base.txt
 
-# IBM Docling — PDF/Office/이미지 등 문서 파싱·구조화
-# TODO: Docling 버전 업데이트 시 breaking change 확인 후 pin 권장
 docling>=2.0
