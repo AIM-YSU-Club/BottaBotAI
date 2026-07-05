@@ -1,0 +1,8 @@
+FROM ollama/ollama:latest
+
+# 쉘(bash)을 실행해서 서버 켜기 -> 5초 대기 -> 모델 다운로드 -> 서버 끄기를 한 세트로 실행
+RUN bash -c "ollama serve & sleep 5 && ollama pull embeddinggemma:latest && pkill ollama"
+
+# 컨테이너가 켜질 때 실행할 명령
+EXPOSE 11434
+CMD ["serve"]

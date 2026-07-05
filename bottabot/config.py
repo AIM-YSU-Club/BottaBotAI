@@ -2,10 +2,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    REDIS_URL: str = "redis://localhost:6379/0"
+    OLLAMA_URL: str = "http://ollama:11434"
+    OLLAMA_EMBEDDING_MODEL: str = "embeddinggemma:latest"
 
-    redis_url: str = "redis://localhost:6379/0"
-    ollama_url: str = "http://ollama:11434"
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()

@@ -1,22 +1,8 @@
 # =============================================================================
 # base.txt — 모든 서비스(api, reranker_worker, docling_worker) 공통 의존성
 # =============================================================================
-# Dockerfile.api / Dockerfile.reranker / Dockerfile.docling 모두 이 파일을
-# 직접 또는 `-r base.txt`로 포함합니다.
-#
-# 포함 범위:
-#   - bottabot/config.py        → 환경변수 설정
-#   - bottabot/celery/app.py    → Celery 브로커/백엔드
-#   - bottabot/main.py, api/    → FastAPI HTTP 서버 (api 컨테이너)
-# =============================================================================
-
-# Celery 비동기 태스크 큐 + Redis 브로커/결과 백엔드
-# [redis] extra: redis-py 포함 (REDIS_URL 연결에 필요)
 celery[redis]>=5.3
-
-# .env / 환경변수 → Settings 객체 (REDIS_URL, OLLAMA_URL 등)
 pydantic-settings>=2.0
-
-# FastAPI HTTP API (api 컨테이너 전용이지만, 워커 Dockerfile도 동일 base를 공유)
-# [standard] extra: uvicorn, httpx, jinja2 등 API 서버 실행에 필요한 도구 포함
 fastapi[standard]>=0.100
+gunicorn
+ollama
