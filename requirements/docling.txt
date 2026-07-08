@@ -2,6 +2,6 @@
 # docling.txt — docling_worker 전용 의존성
 # =============================================================================
 
--r base.txt
+-r base.txt torch.txt
 
 docling>=2.0

@@ -10,7 +10,6 @@ celery_app = Celery(
     backend=settings.REDIS_URL,
     # task 실행 주제들
     include=[
-        "bottabot.celery.tasks.rerank_tasks",
         "bottabot.celery.tasks.docling_tasks",
     ],
 )
@@ -23,7 +22,6 @@ celery_app.conf.update(
     enable_utc=True,
     # task가 등록될 큐를 지정
     task_routes={
-        "bottabot.celery.tasks.rerank_tasks.*": {"queue": "rerank_queue"},
         "bottabot.celery.tasks.docling_tasks.*": {"queue": "docling_queue"},
     },
 )
