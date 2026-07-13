@@ -1,4 +1,5 @@
 import uuid
+from enum import StrEnum
 from typing import Optional
 
 from pgvector.sqlalchemy import Vector
@@ -9,6 +10,12 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 class Base(DeclarativeBase):
     pass
+
+
+class SourceStatus(StrEnum):
+    PENDING = "PENDING"
+    DONE = "DONE"
+    FAILED = "FAILED"
 
 
 class Notebook(Base):
@@ -41,6 +48,12 @@ class Source(Base):
         nullable=False,
     )
     chunk_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default=SourceStatus.PENDING,
+        server_default=SourceStatus.PENDING,
+    )
 
 
 class File(Base):

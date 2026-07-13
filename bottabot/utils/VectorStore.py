@@ -6,7 +6,7 @@ import ollama
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from bottabot.config import settings
-from bottabot.db.models import Document, File, Source
+from bottabot.db.models import Document, File, Source, SourceStatus
 from bottabot.db.session import get_session
 
 
@@ -61,10 +61,32 @@ class VectorStore:
 
         return embeddings
 
+    def create_pending_source(self, notebook_id: uuid.UUID) -> uuid.UUID:
+        """태스크 시작 시 PENDING 상태의 Source를 생성한다."""
+        source_id = uuid.uuid4()
+        with get_session() as session:
+            session.add(
+                Source(
+                    source_id=source_id,
+                    notebook_id=notebook_id,
+                    status=SourceStatus.PENDING,
+                )
+            )
+        return source_id
+
+    def mark_source_failed(self, source_id: uuid.UUID) -> None:
+        """처리 실패 시 Source 상태를 FAILED로 갱신한다."""
+        with get_session() as session:
+            source = session.get(Source, source_id)
+            if source is None:
+                return
+            source.status = SourceStatus.FAILED
+
     # 문서에서 추출한 마크다운 원문을 청킹, 임베딩 후 PGVector DB에 저장
     def store_parsed_document(
         self,
         *,
+        source_id: uuid.UUID,
         file_name: str,
         markdown: str,
         notebook_id: uuid.UUID,
@@ -78,19 +100,13 @@ class VectorStore:
         if len(vectors) != len(chunks):
             raise RuntimeError("청크 수와 임베딩 수가 일치하지 않습니다.")
 
-        source_id = uuid.uuid4()
         file_id = uuid.uuid4()
         document_ids: list[str] = []
 
         with get_session() as session:
-            session.add(
-                Source(
-                    source_id=source_id,
-                    chunk_count=len(chunks),
-                    notebook_id=notebook_id,
-                )
-            )
-            session.flush()
+            source = session.get(Source, source_id)
+            if source is None:
+                raise ValueError(f"Source를 찾을 수 없습니다: {source_id}")
 
             session.add(
                 File(
@@ -115,9 +131,13 @@ class VectorStore:
                 )
                 document_ids.append(str(document_id))
 
+            source.chunk_count = len(chunks)
+            source.status = SourceStatus.DONE
+
         return {
             "source_id": str(source_id),
             "file_id": str(file_id),
             "document_ids": document_ids,
             "chunk_count": len(chunks),
+            "status": SourceStatus.DONE,
         }
