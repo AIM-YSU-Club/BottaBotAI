@@ -13,7 +13,8 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     depends_on:
-      - ollama
+      ollama:
+        condition: service_healthy
     restart: always
 
   docling_worker:
@@ -42,7 +43,8 @@ services:
     platform: linux/amd64
     restart: always
     depends_on:
-      - ollama
+      ollama:
+        condition: service_healthy
   ollama:
     build:
       context: .
@@ -51,7 +53,18 @@ services:
     ports:
       - "11434:11434"
     volumes:
+      # 모델 가중치/매니페스트 영속화. 엔트리포인트가 여기에 pull 한다.
       - ./ollama_data:/root/.ollama
+    env_file:
+      # .env 의 OLLAMA_EMBEDDING_MODEL / OLLAMA_CHAT_LLM / OLLAMA_SUMMARY_LLM 사용
+      - .env
+    healthcheck:
+      # .env 의 임베딩 모델이 준비됐는지 확인 (엔트리포인트 pull 완료 신호)
+      test: ["CMD-SHELL", "ollama list | grep -Fq \"$$OLLAMA_EMBEDDING_MODEL\""]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
     # NVIDIA GPU 가속을 위한 설정
     # GPU가 없거나 Mac 환경에서는 주석 처리
     # deploy:

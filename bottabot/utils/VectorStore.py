@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 import ollama
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from sqlalchemy import select
 
 from bottabot.config import settings
 from bottabot.db.models import Document, File, Source, SourceStatus
@@ -60,6 +62,55 @@ class VectorStore:
             embeddings.append(vector)
 
         return embeddings
+
+    def similarity_search(
+        self,
+        query: str,
+        notebook_id: uuid.UUID,
+        *,
+        top_k: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        notebook 범위에서 코사인 거리(<=>) 기준 top-k 청크를 반환한다.
+
+        반환 항목:
+        - document_id: search_map 매핑에 사용
+        - chunk: LLM 컨텍스트에 삽입할 본문
+        - source_id: 원본 소스 추적용
+        - distance: 작을수록 유사 (cosine distance)
+        """
+        limit = top_k if top_k is not None else settings.RAG_TOP_K
+        vectors = self.embed_texts([query])
+        if not vectors:
+            return []
+
+        query_vector = vectors[0]
+        # pgvector SQLAlchemy helper → ORDER BY embeddings <=> :query
+        distance = Document.embeddings.cosine_distance(query_vector)
+
+        with get_session() as session:
+            rows = session.execute(
+                select(
+                    Document.document_id,
+                    Document.chunk,
+                    Document.source_id,
+                    distance.label("distance"),
+                )
+                .where(Document.notebook_id == notebook_id)
+                .where(Document.embeddings.is_not(None))
+                .order_by(distance)
+                .limit(limit)
+            ).all()
+
+            return [
+                {
+                    "document_id": str(row.document_id),
+                    "chunk": row.chunk or "",
+                    "source_id": str(row.source_id),
+                    "distance": float(row.distance) if row.distance is not None else None,
+                }
+                for row in rows
+            ]
 
     def create_pending_source(self, notebook_id: uuid.UUID) -> uuid.UUID:
         """태스크 시작 시 PENDING 상태의 Source를 생성한다."""
