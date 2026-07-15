@@ -14,7 +14,7 @@ worker_class = "uvicorn.workers.UvicornWorker"
 
 # 4. 프로세스 관리 및 안정성 설정
 backlog = 2048          # 대기 가능한 최대 커넥션 수
-timeout = 30            # 30초 동안 응답이 없는 워커는 죽이고 새로 살림
+timeout = 300           # 스트리밍 채팅을 위해 워커 타임아웃 상향
 keepalive = 2           # HTTP Keep-Alive 시간 설정 (성능 향상)
 
 # 5. 로깅 설정 (서버 터미널이나 파일에서 확인 가능)
