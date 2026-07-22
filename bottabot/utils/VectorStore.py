@@ -1,16 +1,75 @@
 from __future__ import annotations
 
-import uuid
+import uuid, logging
 from typing import Any
 
 import ollama
+from langchain_ollama import OllamaEmbeddings
+import numpy as np
+
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_classic.retrievers import ContextualCompressionRetriever
+from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+
+from langchain_community.vectorstores.utils import DistanceStrategy
+from langchain_community.retrievers import BM25Retriever
+from langchain_classic.retrievers import EnsembleRetriever
+from langchain_postgres.vectorstores import PGVector
+
+from langchain_core.documents import Document as LangchainDocument
+
+from langchain_postgres import PGEngine, PGVectorStore
+
 from sqlalchemy import select
 
 from bottabot.config import settings
 from bottabot.db.models import Document, File, Source, SourceStatus
 from bottabot.db.session import get_session
 
+
+class NormalizedOllamaEmbeddings(OllamaEmbeddings):
+    def embed_documents(self, texts):
+        embeddings = super().embed_documents(texts)
+        return [self._normalize(e) for e in embeddings]
+
+    def embed_query(self, text):
+        embedding = super().embed_query(text)
+        return self._normalize(embedding)
+
+    def _normalize(self, v):
+        norm = np.linalg.norm(v)
+        if norm == 0:
+            return v
+        return (v / norm).tolist()
+
+class RerankManager:
+    _cross_encoder = None
+    @classmethod
+    def get_cross_encoder(cls) -> HuggingFaceCrossEncoder:
+        """크로스 인코더 가져오기 (싱글톤)"""
+        if cls._cross_encoder is None:
+            logging.info(f"크로스 인코더 로드 중: {Config.RERANKING_MODEL_PATH}")
+            logging.info(f"   디바이스: {Config.DEVICE}")
+            
+            cls._cross_encoder = HuggingFaceCrossEncoder(
+                model_name=Config.RERANKING_MODEL_PATH,
+                model_kwargs={'device': Config.DEVICE}
+            )
+            logging.info("크로스 인코더 로드 완료")
+        return cls._cross_encoder
+
+    @classmethod
+    def cleanup(cls):
+        """메모리 정리"""
+        if cls._cross_encoder is not None:
+            del cls._cross_encoder
+            cls._cross_encoder = None
+            
+            if Config.DEVICE == 'cuda':
+                torch.cuda.empty_cache()
+                gc.collect()
+                logging.info("GPU 메모리 정리 완료")
 
 class VectorStore:
     """마크다운 청킹, Ollama 임베딩, pgvector 저장을 담당한다."""
@@ -20,18 +79,33 @@ class VectorStore:
         *,
         chunk_size: int = 512,
         chunk_overlap: int = 128,
-        ollama_url: str | None = None,
-        embedding_model: str | None = None,
     ) -> None:
+        # 텍스트 스플리터 생성
         self._text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             length_function=len,
             is_separator_regex=False,
         )
-        self._ollama_url = ollama_url or settings.OLLAMA_URL
-        self._embedding_model = embedding_model or settings.OLLAMA_EMBEDDING_MODEL
-        self._ollama_client = ollama.Client(host=self._ollama_url)
+        # Ollama 임베딩 함수 생성
+        self._embedding_function = NormalizedOllamaEmbeddings(
+            model=settings.OLLAMA_EMBEDDING_MODEL,
+            base_url=settings.OLLAMA_URL
+        )
+        # PGVector DB 엔진 생성
+        self._pg_engine = PGEngine.from_connection_string(
+            url=f"postgresql+psycopg://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}",
+        )
+        # PGVector Store 생성
+        self._pg_store = PGVectorStore.create_sync(
+            engine=self._pg_engine,
+            table_name="document",
+            embedding_service=self._embedding_function,
+            id_column="document_id",
+            content_column="chunk",
+            embedding_column="embeddings",
+            metadata_columns=["notebook_id", "source_id"],
+        )
 
     # Langchain의 RecursiveTextSplitter로 청킹 수행
     def chunk_markdown(self, text: str) -> list[str]:
@@ -45,23 +119,6 @@ class VectorStore:
             if chunk.strip()
         ]
 
-    # Ollama에 임베딩 요청을 보내고 응답으로 받은 벡터를 반환
-    def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        if not texts:
-            return []
-
-        embeddings: list[list[float]] = []
-        for text in texts:
-            response = self._ollama_client.embeddings(
-                model=self._embedding_model,
-                prompt=text,
-            )
-            vector = response["embedding"]
-            if not vector:
-                raise RuntimeError("Ollama returned an empty embedding vector")
-            embeddings.append(vector)
-
-        return embeddings
 
     def similarity_search(
         self,
@@ -136,59 +193,39 @@ class VectorStore:
     # 문서에서 추출한 마크다운 원문을 청킹, 임베딩 후 PGVector DB에 저장
     def store_parsed_document(
         self,
-        *,
+        notebook_id: uuid.UUID,
         source_id: uuid.UUID,
         file_name: str,
         markdown: str,
-        notebook_id: uuid.UUID,
         path: str | None = None,
     ) -> dict:
         chunks = self.chunk_markdown(markdown)
         if not chunks:
             raise ValueError("문서에서 저장할 텍스트 청크를 만들지 못했습니다.")
 
-        vectors = self.embed_texts(chunks)
-        if len(vectors) != len(chunks):
-            raise RuntimeError("청크 수와 임베딩 수가 일치하지 않습니다.")
+        # Document 저장
+        self._pg_store.add_documents([
+            LangchainDocument(
+                id=str(uuid.uuid4()),
+                page_content=c,
+                metadata={
+                    'notebook_id': notebook_id,
+                    'source_id': source_id
+                }
+            ) for c in chunks
+        ])
 
-        file_id = uuid.uuid4()
-        document_ids: list[str] = []
-
+        # Source 업데이트
         with get_session() as session:
             source = session.get(Source, source_id)
             if source is None:
                 raise ValueError(f"Source를 찾을 수 없습니다: {source_id}")
-
-            session.add(
-                File(
-                    file_id=file_id,
-                    file_name=file_name,
-                    markdown=markdown,
-                    path=path or file_name,
-                    source_id=source_id,
-                )
-            )
-
-            for chunk, vector in zip(chunks, vectors):
-                document_id = uuid.uuid4()
-                session.add(
-                    Document(
-                        document_id=document_id,
-                        chunk=chunk,
-                        embeddings=vector,
-                        notebook_id=notebook_id,
-                        source_id=source_id,
-                    )
-                )
-                document_ids.append(str(document_id))
 
             source.chunk_count = len(chunks)
             source.status = SourceStatus.DONE
 
         return {
             "source_id": str(source_id),
-            "file_id": str(file_id),
-            "document_ids": document_ids,
             "chunk_count": len(chunks),
             "status": SourceStatus.DONE,
         }
