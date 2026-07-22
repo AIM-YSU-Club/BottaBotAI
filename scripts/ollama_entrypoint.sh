@@ -44,6 +44,28 @@ else
   MODELS="$(append_unique "$MODELS" "${OLLAMA_SUMMARY_LLM:-}")"
 fi
 
+# HuggingFace 스타일(org/name) 모델은 Ollama pull 대상이 아니므로 제외
+FILTERED=""
+OLD_IFS=$IFS
+IFS='
+'
+# shellcheck disable=SC2086
+set -- $MODELS
+IFS=$OLD_IFS
+for model in "$@"; do
+  case "$model" in
+    */*)
+      echo "[ollama-entrypoint] skip non-ollama model: $model" >&2
+      ;;
+    "")
+      ;;
+    *)
+      FILTERED="$(append_unique "$FILTERED" "$model")"
+      ;;
+  esac
+done
+MODELS="$FILTERED"
+
 if [ -z "$MODELS" ]; then
   echo "[ollama-entrypoint] ERROR: no models configured." >&2
   echo "  Set OLLAMA_EMBEDDING_MODEL / OLLAMA_CHAT_LLM / OLLAMA_SUMMARY_LLM in .env" >&2

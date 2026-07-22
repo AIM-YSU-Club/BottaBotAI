@@ -9,6 +9,8 @@ ollama
 sqlalchemy>=2.0
 pgvector>=0.3
 psycopg2-binary>=2.9
+sentence-transformers
+rank_bm25
 
 langchain
 langchain-text-splitters>=0.3
