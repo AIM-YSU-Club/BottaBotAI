@@ -38,6 +38,8 @@ def docling_parse(encoded_file: str, file_name: str, notebook_id: str):
             f"status={result['status']}"
         )
 
+        vector_store.mark_source_done(source_id)
+
         return result
     except Exception:
         vector_store.mark_source_failed(source_id)
