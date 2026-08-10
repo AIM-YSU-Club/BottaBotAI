@@ -6,12 +6,11 @@ from bottabot.config import settings
 celery_app = Celery(
     "bottabot",
     # task들을 redis가 관리하도록 설정
-    broker=settings.redis_url,
-    backend=settings.redis_url,
+    broker=settings.REDIS_URL,
+    backend=settings.REDIS_URL,
     # task 실행 주제들
     include=[
-        "bottabot.celery.tasks.reranker",
-        "bottabot.celery.tasks.docling",
+        "bottabot.celery.tasks.docling_tasks",
     ],
 )
 
@@ -23,7 +22,6 @@ celery_app.conf.update(
     enable_utc=True,
     # task가 등록될 큐를 지정
     task_routes={
-        "bottabot.celery.tasks.reranker.*": {"queue": "reranker_queue"},
-        "bottabot.celery.tasks.docling.*": {"queue": "docling_queue"},
+        "bottabot.celery.tasks.docling_tasks.*": {"queue": "docling_queue"},
     },
 )

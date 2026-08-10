@@ -1,0 +1,21 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# 런타임 첫 VectorStore() 생성 시 HF 모델을 받을 캐시 경로
+# docling 의 /root/.cache 볼륨과 겹치지 않도록 분리
+ENV HF_HOME=/opt/huggingface
+ENV TRANSFORMERS_CACHE=/opt/huggingface
+ENV HUGGINGFACE_HUB_CACHE=/opt/huggingface
+
+COPY requirements/base.txt requirements/
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements/base.txt
+
+COPY bottabot/ bottabot/
+
+ENV PYTHONPATH=/app
+
+EXPOSE 8000
+
+CMD ["gunicorn", "bottabot.main:app", "-c", "bottabot/gunicorn.conf.py"]

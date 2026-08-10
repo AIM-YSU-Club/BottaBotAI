@@ -1,0 +1,12 @@
+FROM ollama/ollama:latest
+
+# 빌드 타임 pull 은 사용하지 않는다.
+# compose 볼륨(./ollama_data -> /root/.ollama)이 이미지 레이어를 가리기 때문에
+# 모델 확보는 엔트리포인트가 공유 볼륨에 대해 수행한다.
+COPY scripts/ollama_entrypoint.sh /usr/local/bin/ollama_entrypoint.sh
+RUN chmod +x /usr/local/bin/ollama_entrypoint.sh
+
+EXPOSE 11434
+
+# 공식 이미지 ENTRYPOINT(/bin/ollama)를 덮어쓰고 커스텀 기동 스크립트를 사용
+ENTRYPOINT ["/usr/local/bin/ollama_entrypoint.sh"]
