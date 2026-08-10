@@ -10,11 +10,20 @@ class Settings(BaseSettings):
     OLLAMA_CHAT_LLM: str = "gemma3:1b"
     OLLAMA_SUMMARY_LLM: str = "gemma3:1b"
 
+    HF_HOME: str = "/opt/huggingface"
+    HF_RERANKER_MODEL: str = "Qwen/Qwen3-Reranker-0.6B"
+
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
     DB_USER: str = "postgres"
     DB_PASSWORD: str = ""
     DB_NAME: str = "postgres"
+
+    CHUNK_SIZE: int = 512
+    CHUNK_OVERLAP: int = 128
+    RETRIEVER_SEARCH_K: int = 20
+    RERANKER_TOP_N: int = 5
+    SK_WEIGHTS: list[float] = [0.7, 0.3]
 
     RAG_TOP_K: int = 5
     CHAT_HISTORY_LIMIT: int = 20
@@ -34,6 +43,7 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
+
         user = quote_plus(self.DB_USER)
         password = quote_plus(self.DB_PASSWORD)
         return (

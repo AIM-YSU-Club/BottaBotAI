@@ -8,10 +8,14 @@ services:
       - "8000:8000"
     volumes:
       - ./bottabot:/app/bottabot
+      - ./hf_cache:/opt/huggingface
     env_file:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
+      - HF_HOME=/opt/huggingface
+      - TRANSFORMERS_CACHE=/opt/huggingface
+      - HUGGINGFACE_HUB_CACHE=/opt/huggingface
     depends_on:
       ollama:
         condition: service_healthy
@@ -29,7 +33,9 @@ services:
     env_file:
       - .env
     environment:
-      - HF_HOME=/root/.cache/huggingface
+      - HF_HOME=/opt/huggingface
+      - TRANSFORMERS_CACHE=/opt/huggingface
+      - HUGGINGFACE_HUB_CACHE=/opt/huggingface
       - PYTHONUNBUFFERED=1
     # NVIDIA GPU 가속을 위한 설정
     # GPU가 없거나 Mac 환경에서는 주석 처리
@@ -45,6 +51,7 @@ services:
     depends_on:
       ollama:
         condition: service_healthy
+
   ollama:
     build:
       context: .
@@ -53,13 +60,10 @@ services:
     ports:
       - "11434:11434"
     volumes:
-      # 모델 가중치/매니페스트 영속화. 엔트리포인트가 여기에 pull 한다.
       - ./ollama_data:/root/.ollama
     env_file:
-      # .env 의 OLLAMA_EMBEDDING_MODEL / OLLAMA_CHAT_LLM / OLLAMA_SUMMARY_LLM 사용
       - .env
     healthcheck:
-      # .env 의 임베딩 모델이 준비됐는지 확인 (엔트리포인트 pull 완료 신호)
       test: ["CMD-SHELL", "ollama list | grep -Fq \"$$OLLAMA_EMBEDDING_MODEL\""]
       interval: 10s
       timeout: 5s

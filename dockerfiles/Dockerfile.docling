@@ -9,7 +9,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements/base.txt requirements/docling.txt requirements/
+# docling_cache 볼륨(/root/.cache)에 가려지지 않도록 HF 캐시 분리
+ENV HF_HOME=/opt/huggingface
+ENV TRANSFORMERS_CACHE=/opt/huggingface
+ENV HUGGINGFACE_HUB_CACHE=/opt/huggingface
+
+COPY requirements/base.txt requirements/docling.txt requirements/torch.txt requirements/
 
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements/docling.txt

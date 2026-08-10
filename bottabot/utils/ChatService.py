@@ -197,6 +197,21 @@ class ChatService:
             f"[사용자 질문]\n{prompt.strip()}"
         )
 
+    @staticmethod
+    def _parse_uuid(value: Any) -> uuid.UUID | None:
+        """검색 결과 등에서 온 값을 UUID로 안전하게 변환한다. 실패 시 None."""
+        if value is None:
+            return None
+        if isinstance(value, uuid.UUID):
+            return value
+        text = str(value).strip()
+        if not text or text.lower() in {"none", "null"}:
+            return None
+        try:
+            return uuid.UUID(text)
+        except (ValueError, AttributeError, TypeError):
+            return None
+
     def create_chat_with_search_map(
         self,
         *,
@@ -316,10 +331,10 @@ class ChatService:
         # 4) 질문/출처를 먼저 저장 (스트림 도중 끊겨도 질문·검색 근거는 남김)
         document_ids: list[uuid.UUID] = []
         for hit in hits:
-            raw_id = hit.get("document_id")
-            if not raw_id:
+            parsed = self._parse_uuid(hit.get("document_id"))
+            if parsed is None:
                 continue
-            document_ids.append(uuid.UUID(str(raw_id)))
+            document_ids.append(parsed)
 
         chat_id = self.create_chat_with_search_map(
             chat_session_id=chat_session_id,
