@@ -1,5 +1,5 @@
 # CUDA 12.4 wheels (NVIDIA 서버 / docling_worker 기본값)
-# Mac(CPU) 로컬 빌드는 Dockerfile ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+# transformers는 PyTorch >= 2.5 필요. Mac(CPU)는 Dockerfile ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
 --extra-index-url https://download.pytorch.org/whl/cu124
-torch==2.4.1+cu124
-torchvision==0.19.1+cu124
+torch==2.6.0+cu124
+torchvision==0.21.0+cu124

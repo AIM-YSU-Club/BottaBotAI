@@ -66,7 +66,7 @@ NVIDIA 서버 사전 조건:
 docker compose exec docling_worker python -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.device_count())"
 ```
 
-`True`와 GPU 개수가 나와야 하고, 다음 업로드 로그에 `Docling GPU 가속: cuda:0`이 보여야 합니다.
+`2.6.0+cu124 True`와 GPU 개수가 나와야 하고, 다음 업로드 로그에 `Docling GPU 가속: cuda:0`이 보여야 합니다.
 
 Mac/CPU 로컬 빌드:
 
