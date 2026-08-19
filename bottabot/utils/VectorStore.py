@@ -68,10 +68,17 @@ class VectorStore:
             embedding_column="embeddings",
             metadata_columns=["source_id"],
         )
-        # Hugging Face 리랭커: 캐시에 없으면 첫 생성 시 다운로드 후 CrossEncoder 로드
+        # 리랭커는 검색 시에만 로드한다. 문서 인덱싱 경로에서는 불필요하다.
+        self._reranker = None
+
+    def _get_reranker(self) -> CrossEncoderReranker:
+        """채팅 검색에서만 CrossEncoder를 로드한다."""
+        if self._reranker is not None:
+            return self._reranker
+
         huggingface_hub.snapshot_download(
-            repo_id=settings.HF_RERANKER_MODEL, 
-            cache_dir=settings.HF_HOME
+            repo_id=settings.HF_RERANKER_MODEL,
+            cache_dir=settings.HF_HOME,
         )
         try:
             import torch
@@ -86,6 +93,7 @@ class VectorStore:
             ),
             top_n=settings.RERANKER_TOP_N,
         )
+        return self._reranker
 
     # Langchain의 RecursiveTextSplitter로 청킹 수행
     def chunk_markdown(self, text: str) -> list[str]:
@@ -152,7 +160,7 @@ class VectorStore:
         )
         # 하이브리드 검색기 + 리랭커
         compression_retriever = ContextualCompressionRetriever(
-            base_compressor=self._reranker,
+            base_compressor=self._get_reranker(),
             base_retriever=ensemble_retriever,
         )
         # 검색 수행
