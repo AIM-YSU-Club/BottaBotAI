@@ -259,5 +259,6 @@ BottaBotAI/
 | `Qwen/... file does not exist` (Ollama) | HF 리랭커 이름을 `OLLAMA_MODELS`에 넣지 말 것. `HF_RERANKER_MODEL`만 사용 |
 | API import / 패키지 오류 | `requirements` 변경 후 `docker compose build` |
 | Docling `Accelerator device: 'cpu'` | 워커 이미지가 CPU torch인지 확인 후 `docker compose build docling_worker` |
+| `No space left on device` (HF 리랭커) | 워커 overlay가 가득 참. `./hf_cache`를 `/opt/huggingface`에 마운트했는지, 호스트 디스크 여유를 확인 |
 | DB UUID / FK 오류 | `notebook`, `chat_session`이 존재하는지, ORM과 스키마가 맞는지 |
 | orphan container 경고 | `docker compose up -d --remove-orphans` |
