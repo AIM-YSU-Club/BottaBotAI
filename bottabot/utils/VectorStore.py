@@ -66,7 +66,7 @@ class VectorStore:
             id_column="document_id",
             content_column="chunk",
             embedding_column="embeddings",
-            metadata_columns=["notebook_id", "source_id"],
+            metadata_columns=["notebook_id"],
         )
         # Hugging Face 리랭커: 캐시에 없으면 첫 생성 시 다운로드 후 CrossEncoder 로드
         huggingface_hub.snapshot_download(
@@ -107,7 +107,6 @@ class VectorStore:
                     page_content=row.chunk or "",
                     metadata={
                         "notebook_id": str(row.notebook_id),
-                        "source_id": str(row.source_id),
                         "document_id": str(row.document_id),
                     },
                 )
@@ -156,7 +155,6 @@ class VectorStore:
                 # PGVectorStore 결과는 id 에, BM25 쪽은 metadata.document_id 에 둘 수 있다.
                 "document_id": str(r.metadata.get("document_id") or r.id or ""),
                 "chunk": r.page_content,
-                "source_id": str(r.metadata.get("source_id") or ""),
             }
             for r in results
             if (r.metadata.get("document_id") or r.id)
@@ -182,7 +180,6 @@ class VectorStore:
                 page_content=c,
                 metadata={
                     'notebook_id': notebook_id,
-                    'source_id': source_id
                 }
             ) for c in chunks
         ])
@@ -200,7 +197,7 @@ class VectorStore:
                     path=path,
                     markdown=markdown,
                 )
-        )
+            )
 
         return {
             "source_id": str(source_id),
