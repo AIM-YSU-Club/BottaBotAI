@@ -10,12 +10,13 @@
 # - 공유 볼륨에 한 번 pull 되면 이후 재시작에서는 빠르게 스킵/갱신된다.
 #
 # 모델 목록 출처 (.env → compose env_file):
-# - OLLAMA_EMBEDDING_MODEL
-# - OLLAMA_CHAT_LLM
-# - OLLAMA_SUMMARY_LLM
-# 선택: OLLAMA_PULL_MODELS 가 있으면 위 변수 대신 이 목록만 사용
+# - OLLAMA_MODELS : 공백 구분 모델 목록 (필수)
+# - 목록에 없는 설치 모델은 기동 시 삭제한다.
 # =============================================================================
 set -eu
+
+READY_STAMP=/tmp/ollama-models-ready
+rm -f "${READY_STAMP}"
 
 append_unique() {
   # $1 = accumulator (newline-separated), $2 = candidate model name
@@ -30,19 +31,39 @@ append_unique() {
   fi
 }
 
+# ollama list 의 NAME 과 pull 인자를 같은 키로 비교하기 위해 태그가 없으면 :latest 를 붙인다.
+normalize_model() {
+  name="$1"
+  [ -z "$name" ] && return
+  case "$name" in
+    *:*)
+      printf '%s' "$name"
+      ;;
+    *)
+      printf '%s:latest' "$name"
+      ;;
+  esac
+}
+
+is_desired_model() {
+  candidate="$(normalize_model "$1")"
+  [ -z "$candidate" ] && return 1
+  printf '%s\n' "$NORMALIZED_MODELS" | grep -Fxq "$candidate" 2>/dev/null
+}
+
 MODELS=""
-if [ -n "${OLLAMA_PULL_MODELS:-}" ]; then
-  # shell word-split override list
-  # shellcheck disable=SC2086
-  set -- $OLLAMA_PULL_MODELS
-  for model in "$@"; do
-    MODELS="$(append_unique "$MODELS" "$model")"
-  done
-else
-  MODELS="$(append_unique "$MODELS" "${OLLAMA_EMBEDDING_MODEL:-}")"
-  MODELS="$(append_unique "$MODELS" "${OLLAMA_CHAT_LLM:-}")"
-  MODELS="$(append_unique "$MODELS" "${OLLAMA_SUMMARY_LLM:-}")"
+if [ -z "${OLLAMA_MODELS:-}" ]; then
+  echo "[ollama-entrypoint] ERROR: OLLAMA_MODELS is empty." >&2
+  echo "  Set OLLAMA_MODELS in .env as a space-separated list of Ollama models." >&2
+  exit 1
 fi
+
+# shell word-split OLLAMA_MODELS
+# shellcheck disable=SC2086
+set -- $OLLAMA_MODELS
+for model in "$@"; do
+  MODELS="$(append_unique "$MODELS" "$model")"
+done
 
 # HuggingFace 스타일(org/name) 모델은 Ollama pull 대상이 아니므로 제외
 FILTERED=""
@@ -67,13 +88,22 @@ done
 MODELS="$FILTERED"
 
 if [ -z "$MODELS" ]; then
-  echo "[ollama-entrypoint] ERROR: no models configured." >&2
-  echo "  Set OLLAMA_EMBEDDING_MODEL / OLLAMA_CHAT_LLM / OLLAMA_SUMMARY_LLM in .env" >&2
-  echo "  or OLLAMA_PULL_MODELS as a space-separated override." >&2
+  echo "[ollama-entrypoint] ERROR: no Ollama models left after filtering OLLAMA_MODELS." >&2
   exit 1
 fi
 
-echo "[ollama-entrypoint] models from env:"
+NORMALIZED_MODELS=""
+OLD_IFS=$IFS
+IFS='
+'
+# shellcheck disable=SC2086
+set -- $MODELS
+IFS=$OLD_IFS
+for model in "$@"; do
+  NORMALIZED_MODELS="$(append_unique "$NORMALIZED_MODELS" "$(normalize_model "$model")")"
+done
+
+echo "[ollama-entrypoint] models from OLLAMA_MODELS:"
 printf '%s\n' "$MODELS" | while IFS= read -r model; do
   [ -n "$model" ] && echo "  - $model"
 done
@@ -106,6 +136,23 @@ if [ "$ready" -ne 1 ]; then
   exit 1
 fi
 
+echo "[ollama-entrypoint] removing models not listed in OLLAMA_MODELS..."
+INSTALLED="$(ollama list 2>/dev/null | awk 'NR > 1 { print $1 }')"
+OLD_IFS=$IFS
+IFS='
+'
+# shellcheck disable=SC2086
+set -- $INSTALLED
+IFS=$OLD_IFS
+for installed in "$@"; do
+  [ -z "$installed" ] && continue
+  if is_desired_model "$installed"; then
+    continue
+  fi
+  echo "[ollama-entrypoint] rm: ${installed}"
+  ollama rm "${installed}"
+done
+
 echo "[ollama-entrypoint] ensuring models exist on shared volume (/root/.ollama)..."
 OLD_IFS=$IFS
 IFS='
@@ -121,6 +168,7 @@ done
 
 echo "[ollama-entrypoint] models ready:"
 ollama list || true
+touch "${READY_STAMP}"
 
 echo "[ollama-entrypoint] handing off to ollama serve (pid=${OLLAMA_PID})"
 trap - EXIT INT TERM

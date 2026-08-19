@@ -18,7 +18,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sqlalchemy import select
 
 from bottabot.config import settings
-from bottabot.db.models import Document, Source, SourceStatus
+from bottabot.db.models import Document, Source, SourceStatus, File
 from bottabot.db.session import get_session
 
 # 정규화 기능을 겸하는 임베딩 함수로 상속
@@ -186,6 +186,21 @@ class VectorStore:
                 }
             ) for c in chunks
         ])
+
+        # DB에 파일 정보 저장
+        with get_session() as session:
+            source = session.get(Source, source_id)
+            if source is not None:
+                source.chunk_count = len(chunks)
+            session.add(
+                File(
+                    file_id=uuid.uuid4(),
+                    source_id=source_id,
+                    file_name=file_name,
+                    path=path,
+                    markdown=markdown,
+                )
+        )
 
         return {
             "source_id": str(source_id),

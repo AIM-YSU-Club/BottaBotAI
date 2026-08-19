@@ -7,8 +7,18 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     OLLAMA_URL: str = "http://ollama:11434"
     OLLAMA_EMBEDDING_MODEL: str = "embeddinggemma:latest"
-    OLLAMA_CHAT_LLM: str = "gemma3:1b"
+    OLLAMA_CHAT_LLM: str = "gemma4:latest"
     OLLAMA_SUMMARY_LLM: str = "gemma3:1b"
+    OLLAMA_CAPTION_VLM: str = "gemma4:latest"
+
+    HISTORY_SUMMARY_INSTRUCTIONS: str = (
+        "다음 대화를 짧고 정확하게 요약하세요.",
+        "핵심 질문, 결정사항, 미해결 이슈만 남기세요."
+    )
+
+    IMAGE_CAPTION_INSTRUCTIONS: str = (
+        
+    )
 
     HF_HOME: str = "/opt/huggingface"
     HF_RERANKER_MODEL: str = "Qwen/Qwen3-Reranker-0.6B"

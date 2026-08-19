@@ -64,7 +64,7 @@ services:
     env_file:
       - .env
     healthcheck:
-      test: ["CMD-SHELL", "ollama list | grep -Fq \"$$OLLAMA_EMBEDDING_MODEL\""]
+      test: ["CMD-SHELL", "test -f /tmp/ollama-models-ready && ollama list >/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 60
