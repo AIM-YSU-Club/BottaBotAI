@@ -7,7 +7,7 @@
 #   /root/.ollama 를 덮어쓴다.
 # - 따라서 Dockerfile RUN 단계에서 pull 한 모델은 볼륨이 비어 있으면
 #   컨테이너 시작 후 보이지 않는다.
-# - 공유 볼륨에 한 번 pull 되면 이후 재시작에서는 빠르게 스킵/갱신된다.
+# - 공유 볼륨에 이미 있는 모델은 pull 하지 않는다.
 #
 # 모델 목록 출처 (.env → compose env_file):
 # - OLLAMA_MODELS : 공백 구분 모델 목록 (필수)
@@ -49,6 +49,12 @@ is_desired_model() {
   candidate="$(normalize_model "$1")"
   [ -z "$candidate" ] && return 1
   printf '%s\n' "$NORMALIZED_MODELS" | grep -Fxq "$candidate" 2>/dev/null
+}
+
+is_installed_model() {
+  candidate="$(normalize_model "$1")"
+  [ -z "$candidate" ] && return 1
+  printf '%s\n' "$INSTALLED_NORMALIZED" | grep -Fxq "$candidate" 2>/dev/null
 }
 
 MODELS=""
@@ -153,6 +159,19 @@ for installed in "$@"; do
   ollama rm "${installed}"
 done
 
+INSTALLED_NORMALIZED=""
+INSTALLED="$(ollama list 2>/dev/null | awk 'NR > 1 { print $1 }')"
+OLD_IFS=$IFS
+IFS='
+'
+# shellcheck disable=SC2086
+set -- $INSTALLED
+IFS=$OLD_IFS
+for installed in "$@"; do
+  [ -z "$installed" ] && continue
+  INSTALLED_NORMALIZED="$(append_unique "$INSTALLED_NORMALIZED" "$(normalize_model "$installed")")"
+done
+
 echo "[ollama-entrypoint] ensuring models exist on shared volume (/root/.ollama)..."
 OLD_IFS=$IFS
 IFS='
@@ -162,6 +181,10 @@ set -- $MODELS
 IFS=$OLD_IFS
 for model in "$@"; do
   [ -z "$model" ] && continue
+  if is_installed_model "$model"; then
+    echo "[ollama-entrypoint] skip (already installed): ${model}"
+    continue
+  fi
   echo "[ollama-entrypoint] pull: ${model}"
   ollama pull "${model}"
 done

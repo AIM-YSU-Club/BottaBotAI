@@ -45,7 +45,7 @@ HF_HOME=/opt/huggingface
 HF_RERANKER_MODEL=Qwen/Qwen3-Reranker-0.6B
 ```
 
-Ollama 컨테이너는 기동 시 `.env`의 `OLLAMA_MODELS`(공백 구분)만 pull 하고, 목록에 없는 설치 모델은 삭제합니다.  
+Ollama 컨테이너는 기동 시 `.env`의 `OLLAMA_MODELS`(공백 구분) 중 **아직 없는 모델만** pull 하고, 목록에 없는 설치 모델은 삭제합니다.  
 앱 런타임이 실제로 호출하는 모델은 `OLLAMA_EMBEDDING_MODEL`, `OLLAMA_CHAT_LLM`, `OLLAMA_SUMMARY_LLM`이며, 이 값들은 `OLLAMA_MODELS`에도 포함되어 있어야 합니다.  
 Hugging Face 경로 형식(`org/name`)은 Ollama pull 대상이 아니며, `VectorStore` 초기화 시 캐시에 없으면 다운로드합니다.
 
