@@ -60,10 +60,16 @@ class DoclingParser:
 
 
         if torch.cuda.is_available():
-            # GPU 사용
             self.pipeline_options.accelerator_options = AcceleratorOptions(
                 device=AcceleratorDevice.CUDA
             )
+            print(
+                f"Docling GPU 가속: cuda:{torch.cuda.current_device()} "
+                f"({torch.cuda.get_device_name(0)}), "
+                f"device_count={torch.cuda.device_count()}"
+            )
+        else:
+            print("Docling GPU 없음 — CPU로 레이아웃 분석을 수행합니다. (torch.cuda.is_available()=False)")
         
     # 파일 타입 검사 및 포맷 옵션 설정
         match self.file_type:

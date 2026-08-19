@@ -25,6 +25,8 @@ services:
     build:
       context: .
       dockerfile: dockerfiles/Dockerfile.docling
+      args:
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cu124
     container_name: worker_docling
     command: celery -A bottabot.celery.app worker -Q docling_queue --loglevel=info -c 1
     volumes:
@@ -37,6 +39,8 @@ services:
       - TRANSFORMERS_CACHE=/opt/huggingface
       - HUGGINGFACE_HUB_CACHE=/opt/huggingface
       - PYTHONUNBUFFERED=1
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     # NVIDIA GPU 가속을 위한 설정
     # GPU가 없거나 Mac 환경에서는 주석 처리
     deploy:

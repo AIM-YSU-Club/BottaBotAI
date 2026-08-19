@@ -73,8 +73,17 @@ class VectorStore:
             repo_id=settings.HF_RERANKER_MODEL, 
             cache_dir=settings.HF_HOME
         )
+        try:
+            import torch
+            rerank_device = "cuda" if torch.cuda.is_available() else "cpu"
+        except ImportError:
+            rerank_device = "cpu"
+        logging.info("CrossEncoder device: %s", rerank_device)
         self._reranker = CrossEncoderReranker(
-            model=HuggingFaceCrossEncoder(model_name=settings.HF_RERANKER_MODEL),
+            model=HuggingFaceCrossEncoder(
+                model_name=settings.HF_RERANKER_MODEL,
+                model_kwargs={"device": rerank_device},
+            ),
             top_n=settings.RERANKER_TOP_N,
         )
 

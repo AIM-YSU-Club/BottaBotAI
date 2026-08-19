@@ -14,10 +14,15 @@ ENV HF_HOME=/opt/huggingface
 ENV TRANSFORMERS_CACHE=/opt/huggingface
 ENV HUGGINGFACE_HUB_CACHE=/opt/huggingface
 
-COPY requirements/base.txt requirements/docling.txt requirements/torch.txt requirements/
+# 기본은 CUDA 12.4. Mac/CPU 빌드: --build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu124
 
+COPY requirements/base.txt requirements/docling.txt requirements/
+
+# docling이 PyPI CPU torch를 끌어올 수 있어, CUDA/지정 휠은 마지막에 덮어쓴다.
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements/docling.txt
+    && pip install --no-cache-dir -r requirements/docling.txt \
+    && pip install --no-cache-dir --force-reinstall torch==2.4.1 torchvision==0.19.1 --index-url ${TORCH_INDEX_URL}
 
 COPY bottabot/ bottabot/
 

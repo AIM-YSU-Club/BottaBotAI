@@ -49,6 +49,38 @@ Ollama 컨테이너는 기동 시 `.env`의 `OLLAMA_MODELS`(공백 구분)만 pu
 앱 런타임이 실제로 호출하는 모델은 `OLLAMA_EMBEDDING_MODEL`, `OLLAMA_CHAT_LLM`, `OLLAMA_SUMMARY_LLM`이며, 이 값들은 `OLLAMA_MODELS`에도 포함되어 있어야 합니다.  
 Hugging Face 경로 형식(`org/name`)은 Ollama pull 대상이 아니며, `VectorStore` 초기화 시 캐시에 없으면 다운로드합니다.
 
+## GPU 가속 (docling_worker)
+
+Ollama는 이미 CUDA를 쓰지만, Docling 레이아웃/테이블 모델은 **워커 이미지의 PyTorch**를 씁니다.  
+CPU 휠(`pytorch.org/whl/cpu`)이 설치되어 있으면 `torch.cuda.is_available()`이 False라 로그에 `Accelerator device: 'cpu'`가 나옵니다.
+
+NVIDIA 서버 사전 조건:
+
+1. 호스트에 NVIDIA 드라이버 + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+2. `docker compose build docling_worker` — CUDA 12.4 PyTorch가 Dockerfile에 들어가 있어야 함 (코드만 마운트해서는 torch가 안 바뀜)
+3. `docker compose up -d docling_worker`
+
+확인:
+
+```bash
+docker compose exec docling_worker python -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.device_count())"
+```
+
+`True`와 GPU 개수가 나와야 하고, 다음 업로드 로그에 `Docling GPU 가속: cuda:0`이 보여야 합니다.
+
+Mac/CPU 로컬 빌드:
+
+```bash
+docker compose build --build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu docling_worker
+```
+
+Ollama와 워커가 GPU 메모리를 나눠 쓰면, 워커만 특정 GPU에 고정할 수 있습니다.
+
+```yaml
+# docker-compose.yml docling_worker.environment
+- NVIDIA_VISIBLE_DEVICES=0
+```
+
 ## Docker Compose로 실행
 
 ```bash
@@ -226,5 +258,6 @@ BottaBotAI/
 | `ai_ollama is unhealthy` | `docker compose logs ollama` — 모델 pull 실패/지연, `.env`의 `OLLAMA_MODELS` |
 | `Qwen/... file does not exist` (Ollama) | HF 리랭커 이름을 `OLLAMA_MODELS`에 넣지 말 것. `HF_RERANKER_MODEL`만 사용 |
 | API import / 패키지 오류 | `requirements` 변경 후 `docker compose build` |
+| Docling `Accelerator device: 'cpu'` | 워커 이미지가 CPU torch인지 확인 후 `docker compose build docling_worker` |
 | DB UUID / FK 오류 | `notebook`, `chat_session`이 존재하는지, ORM과 스키마가 맞는지 |
 | orphan container 경고 | `docker compose up -d --remove-orphans` |
