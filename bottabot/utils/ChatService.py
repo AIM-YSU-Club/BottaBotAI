@@ -100,10 +100,7 @@ class ChatService:
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        "다음 대화를 짧고 정확하게 요약하세요. "
-                        "핵심 질문, 결정사항, 미해결 이슈만 남기세요."
-                    ),
+                    "content": settings.HISTORY_SUMMARY_INSTRUCTIONS,
                 },
                 {
                     "role": "user",

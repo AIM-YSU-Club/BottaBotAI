@@ -7,7 +7,12 @@ from bottabot.config import settings
 
 # Docling
 from docling.datamodel.base_models import InputFormat, DocumentStream, NodeItem
-from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions, AcceleratorDevice
+from docling.datamodel.pipeline_options import (
+    PdfPipelineOptions, 
+    AcceleratorOptions, 
+    AcceleratorDevice,
+    PictureDescriptionApiOptions # 이미지 캡션 생성
+)
 from docling.document_converter import DocumentConverter, PdfFormatOption, WordFormatOption, PowerpointFormatOption, ExcelFormatOption
 from docling.datamodel.document import PictureItem, TableItem
 
@@ -35,6 +40,24 @@ class DoclingParser:
         self.pipeline_options.generate_table_images = True
         # 이미지 크기가 높은수록 해상도 좋음, VLM 분석 정확도 향상
         self.pipeline_options.images_scale = 3.0
+
+        # 이미지 캡션 생성 옵션 O / 외부 서비스(Ollama) 이용
+        self.pipeline_options.do_picture_description = True
+        self.pipeline_options.enable_remote_services = True
+
+        # 이미지 캡션 생성 API 구성 (Ollama)
+        self.pipeline_options.picture_description_options = PictureDescriptionApiOptions(
+            url=f"{settings.OLLAMA_URL}/v1/chat/completions",
+            params={
+                "model": settings.OLLAMA_CAPTION_VLM,
+                "max_tokens": 300,
+                "temperature": 0.0,
+            },
+            prompt=settings.IMAGE_CAPTION_INSTRUCTIONS,
+            timeout=90.0,
+            concurrency=1  # Ollama는 보통 1이 안정적
+        )
+
 
         if torch.cuda.is_available():
             # GPU 사용
