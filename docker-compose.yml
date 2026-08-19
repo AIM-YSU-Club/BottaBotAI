@@ -67,6 +67,7 @@ services:
       - "11434:11434"
     volumes:
       - ./ollama_data:/root/.ollama
+      - ./scripts/ollama_entrypoint.sh:/usr/local/bin/ollama_entrypoint.sh:ro
     env_file:
       - .env
     healthcheck:

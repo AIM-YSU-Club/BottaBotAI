@@ -9,8 +9,9 @@
 #   컨테이너 시작 후 보이지 않는다.
 # - 공유 볼륨에 이미 있는 모델은 pull 하지 않는다.
 #
-# 모델 목록 출처 (.env → compose env_file):
-# - OLLAMA_MODELS : 공백 구분 모델 목록 (필수)
+# 모델 목록 출처:
+# - OLLAMA_PULL_MODELS : 공백 구분 모델 목록 (.env)
+# - OLLAMA_MODELS      : 쓰지 말 것. Ollama가 모델 디렉터리 경로로 해석한다.
 # - 목록에 없는 설치 모델은 기동 시 삭제한다.
 # =============================================================================
 set -eu
@@ -34,7 +35,14 @@ append_unique() {
 # ollama list 의 NAME 과 pull 인자를 같은 키로 비교하기 위해 태그가 없으면 :latest 를 붙인다.
 normalize_model() {
   name="$1"
+  name="$(printf '%s' "$name" | tr -d '\r')"
   [ -z "$name" ] && return
+  # registry.ollama.ai/library/gemma4:latest -> gemma4:latest
+  case "$name" in
+    */*)
+      name="${name##*/}"
+      ;;
+  esac
   case "$name" in
     *:*)
       printf '%s' "$name"
@@ -58,15 +66,18 @@ is_installed_model() {
 }
 
 MODELS=""
-if [ -z "${OLLAMA_MODELS:-}" ]; then
-  echo "[ollama-entrypoint] ERROR: OLLAMA_MODELS is empty." >&2
-  echo "  Set OLLAMA_MODELS in .env as a space-separated list of Ollama models." >&2
+PULL_LIST="${OLLAMA_PULL_MODELS:-}"
+PULL_LIST="$(printf '%s' "$PULL_LIST" | tr -d '"')"
+if [ -z "$PULL_LIST" ]; then
+  echo "[ollama-entrypoint] ERROR: OLLAMA_PULL_MODELS is empty." >&2
+  echo "  Set OLLAMA_PULL_MODELS in .env (space-separated model names)." >&2
+  echo "  Do not use OLLAMA_MODELS for that list; Ollama treats it as a directory path." >&2
   exit 1
 fi
 
-# shell word-split OLLAMA_MODELS
+# shell word-split
 # shellcheck disable=SC2086
-set -- $OLLAMA_MODELS
+set -- $PULL_LIST
 for model in "$@"; do
   MODELS="$(append_unique "$MODELS" "$model")"
 done
@@ -94,7 +105,7 @@ done
 MODELS="$FILTERED"
 
 if [ -z "$MODELS" ]; then
-  echo "[ollama-entrypoint] ERROR: no Ollama models left after filtering OLLAMA_MODELS." >&2
+  echo "[ollama-entrypoint] ERROR: no Ollama models left after filtering OLLAMA_PULL_MODELS." >&2
   exit 1
 fi
 
@@ -109,7 +120,7 @@ for model in "$@"; do
   NORMALIZED_MODELS="$(append_unique "$NORMALIZED_MODELS" "$(normalize_model "$model")")"
 done
 
-echo "[ollama-entrypoint] models from OLLAMA_MODELS:"
+echo "[ollama-entrypoint] models from OLLAMA_PULL_MODELS:"
 printf '%s\n' "$MODELS" | while IFS= read -r model; do
   [ -n "$model" ] && echo "  - $model"
 done
@@ -142,7 +153,7 @@ if [ "$ready" -ne 1 ]; then
   exit 1
 fi
 
-echo "[ollama-entrypoint] removing models not listed in OLLAMA_MODELS..."
+echo "[ollama-entrypoint] removing models not listed in OLLAMA_PULL_MODELS..."
 INSTALLED="$(ollama list 2>/dev/null | awk 'NR > 1 { print $1 }')"
 OLD_IFS=$IFS
 IFS='
@@ -171,6 +182,15 @@ for installed in "$@"; do
   [ -z "$installed" ] && continue
   INSTALLED_NORMALIZED="$(append_unique "$INSTALLED_NORMALIZED" "$(normalize_model "$installed")")"
 done
+
+echo "[ollama-entrypoint] already installed:"
+if [ -z "$INSTALLED_NORMALIZED" ]; then
+  echo "  (none)"
+else
+  printf '%s\n' "$INSTALLED_NORMALIZED" | while IFS= read -r installed; do
+    [ -n "$installed" ] && echo "  - $installed"
+  done
+fi
 
 echo "[ollama-entrypoint] ensuring models exist on shared volume (/root/.ollama)..."
 OLD_IFS=$IFS

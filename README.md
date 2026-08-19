@@ -38,15 +38,16 @@ REDIS_URL=redis://host.docker.internal:6379/0
 
 # Ollama (compose 내부에서는 서비스명 사용)
 OLLAMA_URL=http://ollama:11434
-OLLAMA_MODELS="embeddinggemma:latest gemma4:latest gemma3:1b"
+OLLAMA_PULL_MODELS="embeddinggemma:latest gemma4:latest gemma3:1b"
 
 # Hugging Face 리랭커 (API/워커 런타임에 캐시 다운로드)
 HF_HOME=/opt/huggingface
 HF_RERANKER_MODEL=Qwen/Qwen3-Reranker-0.6B
 ```
 
-Ollama 컨테이너는 기동 시 `.env`의 `OLLAMA_MODELS`(공백 구분) 중 **아직 없는 모델만** pull 하고, 목록에 없는 설치 모델은 삭제합니다.  
-앱 런타임이 실제로 호출하는 모델은 `OLLAMA_EMBEDDING_MODEL`, `OLLAMA_CHAT_LLM`, `OLLAMA_SUMMARY_LLM`이며, 이 값들은 `OLLAMA_MODELS`에도 포함되어 있어야 합니다.  
+Ollama 컨테이너는 기동 시 `.env`의 `OLLAMA_PULL_MODELS`(공백 구분) 중 **아직 없는 모델만** pull 하고, 목록에 없는 설치 모델은 삭제합니다.  
+`OLLAMA_MODELS`는 Ollama가 모델 디렉터리 경로로 쓰므로 목록 변수로 두지 마세요.  
+앱 런타임이 실제로 호출하는 모델은 `OLLAMA_EMBEDDING_MODEL`, `OLLAMA_CHAT_LLM`, `OLLAMA_SUMMARY_LLM`이며, 이 값들은 `OLLAMA_PULL_MODELS`에도 포함되어 있어야 합니다.  
 Hugging Face 경로 형식(`org/name`)은 Ollama pull 대상이 아니며, `VectorStore` 초기화 시 캐시에 없으면 다운로드합니다.
 
 ## GPU 가속 (docling_worker)
@@ -255,8 +256,8 @@ BottaBotAI/
 
 | 증상 | 확인 |
 |---|---|
-| `ai_ollama is unhealthy` | `docker compose logs ollama` — 모델 pull 실패/지연, `.env`의 `OLLAMA_MODELS` |
-| `Qwen/... file does not exist` (Ollama) | HF 리랭커 이름을 `OLLAMA_MODELS`에 넣지 말 것. `HF_RERANKER_MODEL`만 사용 |
+| `ai_ollama is unhealthy` | `docker compose logs ollama` — 모델 pull 실패/지연, `.env`의 `OLLAMA_PULL_MODELS` |
+| `Qwen/... file does not exist` (Ollama) | HF 리랭커 이름을 `OLLAMA_PULL_MODELS`에 넣지 말 것. `HF_RERANKER_MODEL`만 사용 |
 | API import / 패키지 오류 | `requirements` 변경 후 `docker compose build` |
 | Docling `Accelerator device: 'cpu'` | 워커 이미지가 CPU torch인지 확인 후 `docker compose build docling_worker` |
 | `No space left on device` (HF 리랭커) | 워커 overlay가 가득 참. `./hf_cache`를 `/opt/huggingface`에 마운트했는지, 호스트 디스크 여유를 확인 |
