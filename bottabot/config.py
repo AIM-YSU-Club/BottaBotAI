@@ -12,12 +12,14 @@ class Settings(BaseSettings):
     OLLAMA_CAPTION_VLM: str = "gemma4:latest"
 
     HISTORY_SUMMARY_INSTRUCTIONS: str = (
-        "다음 대화를 짧고 정확하게 요약하세요.",
-        "핵심 질문, 결정사항, 미해결 이슈만 남기세요."
+        "다음 대화를 짧고 정확하게 요약하세요.\n"
+        "핵심 질문, 결정사항, 미해결 이슈만 남기세요.\n"
     )
 
     IMAGE_CAPTION_INSTRUCTIONS: str = (
-        
+        "이미지에 대한 분석을 수행하고 요약하시오.\n"
+        "차트나 흐름도의 경우 논리적 순서에 집중하시오.\n"
+        "도표나 그래프의 경우 각 시리즈의 구분과 증가/감소 추이에 대해 집중하시오.\n"
     )
 
     HF_HOME: str = "/opt/huggingface"
