@@ -76,16 +76,16 @@ class File(Base):
 
 
 class Document(Base):
-    """벡터화를 위해 쪼개진 문서 청크. Notebook에만 소속되며 Source FK는 두지 않는다."""
+    """벡터화를 위해 쪼개진 문서 청크. Source에 소속되며 노트북은 source → notebook으로 식별한다."""
 
     __tablename__ = "document"
 
     document_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    notebook_id: Mapped[uuid.UUID] = mapped_column(
+    source_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("notebook.notebook_id"),
+        ForeignKey("source.source_id"),
         nullable=False,
     )
     chunk: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

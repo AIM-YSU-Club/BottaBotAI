@@ -66,7 +66,7 @@ class VectorStore:
             id_column="document_id",
             content_column="chunk",
             embedding_column="embeddings",
-            metadata_columns=["notebook_id"],
+            metadata_columns=["source_id"],
         )
         # Hugging Face 리랭커: 캐시에 없으면 첫 생성 시 다운로드 후 CrossEncoder 로드
         huggingface_hub.snapshot_download(
@@ -92,12 +92,20 @@ class VectorStore:
 
 
     def similarity_search(self, query: str, notebook_id: uuid.UUID) -> list[dict[str, Any]]:
-        # DB에서 Notebook의 Document 조회
-        # commit 시 객체가 expire 되므로, 세션 안에서 값을 읽어 LangchainDocument 로 변환한다.
+        """노트북에 속한 소스의 청크만 대상으로 하이브리드 검색 수행."""
         with get_session() as session:
+            source_ids = list(
+                session.execute(
+                    select(Source.source_id).where(Source.notebook_id == notebook_id)
+                ).scalars().all()
+            )
+            if not source_ids:
+                logging.info("검색 대상 소스 없음")
+                return []
+
             rows = session.execute(
                 select(Document)
-                .where(Document.notebook_id == notebook_id)
+                .where(Document.source_id.in_(source_ids))
                 .where(Document.chunk.is_not(None))
             ).scalars().all()
 
@@ -106,18 +114,22 @@ class VectorStore:
                     id=str(row.document_id),
                     page_content=row.chunk or "",
                     metadata={
-                        "notebook_id": str(row.notebook_id),
+                        "source_id": str(row.source_id),
                         "document_id": str(row.document_id),
                     },
                 )
                 for row in rows
             ]
 
-        # 기본적인 의미 기반 검색기 생성
+        if not docstore:
+            logging.info("검색 대상 청크 없음")
+            return []
+
+        source_id_strs = [str(sid) for sid in source_ids]
         base_retriever = self._pg_store.as_retriever(
             search_kwargs={
                 "k": settings.RETRIEVER_SEARCH_K,
-                "filter": {"notebook_id": {"$eq": str(notebook_id)}},
+                "filter": {"source_id": {"$in": source_id_strs}},
             }
         )
         # 키워드 기반 검색기 생성
@@ -155,6 +167,7 @@ class VectorStore:
                 # PGVectorStore 결과는 id 에, BM25 쪽은 metadata.document_id 에 둘 수 있다.
                 "document_id": str(r.metadata.get("document_id") or r.id or ""),
                 "chunk": r.page_content,
+                "source_id": str(r.metadata.get("source_id") or ""),
             }
             for r in results
             if (r.metadata.get("document_id") or r.id)
@@ -163,7 +176,6 @@ class VectorStore:
     # 문서에서 추출한 마크다운 원문을 청킹, 임베딩 후 PGVector DB에 저장
     def store_parsed_document(
         self,
-        notebook_id: uuid.UUID,
         source_id: uuid.UUID,
         file_name: str,
         markdown: str,
@@ -173,13 +185,12 @@ class VectorStore:
         if not chunks:
             raise ValueError("문서에서 저장할 텍스트 청크를 만들지 못했습니다.")
 
-        # Document 저장
         self._pg_store.add_documents([
             LangchainDocument(
                 id=str(uuid.uuid4()),
                 page_content=c,
                 metadata={
-                    'notebook_id': notebook_id,
+                    'source_id': source_id,
                 }
             ) for c in chunks
         ])

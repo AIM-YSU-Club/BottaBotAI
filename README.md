@@ -93,13 +93,15 @@ docker compose build api docling_worker && docker compose up -d
 
 1. `POST /docparse/upload` → Celery `docling_parse` 태스크 enqueue  
 2. Docling으로 마크다운 추출  
-3. 청킹 → Ollama 임베딩 → `document` 테이블 저장  
+3. 청킹 → Ollama 임베딩 → `document` 저장 (`source_id` FK)  
 4. `source` 상태: `PENDING` → `DONE` / `FAILED`
+
+스키마를 `document.notebook_id`에서 `document.source_id`로 바꾼 경우 `scripts/migrate_document_fk_to_source.sql`을 먼저 실행한다.
 
 ### 채팅 (RAG)
 
 1. `chat_session` → `notebook_id` 확인  
-2. notebook 범위 하이브리드 검색(벡터 + BM25) + 리랭크  
+2. 노트북의 `source_id` 목록으로 청크를 하이브리드 검색(벡터 `$in` + BM25) + 리랭크  
 3. 최근 대화 요약 (`OLLAMA_SUMMARY_LLM`)  
 4. 프롬프트 구성 후 `OLLAMA_CHAT_LLM` SSE 스트리밍  
 5. `chat` / `search_map` / `answer_detail` 저장

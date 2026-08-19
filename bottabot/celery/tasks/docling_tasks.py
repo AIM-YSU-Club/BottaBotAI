@@ -29,7 +29,6 @@ def docling_parse(encoded_file: str, file_name: str, notebook_id: str):
             source_id=source_id,
             file_name=file_name,
             markdown=dp.parsed_markdown,
-            notebook_id=notebook_uuid,
         )
 
         print(
